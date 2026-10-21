@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Préstamos - Biblioteca</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configuración de Tailwind para Modo Oscuro por clase -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    
+    <!-- Evitar parpadeo (FOUC) al cargar en modo oscuro -->
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .table-wrapper::-webkit-scrollbar {
+            height: 8px;
+        }
+        .table-wrapper::-webkit-scrollbar-track {
+            background: #e2e8f0; 
+            border-radius: 4px;
+        }
+        .table-wrapper::-webkit-scrollbar-thumb {
+            background: #94a3b8; 
+            border-radius: 4px;
+        }
+        .table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+        
+        /* Dark mode scrollbars */
+        .dark .table-wrapper::-webkit-scrollbar-track {
+            background: #334155; 
+        }
+        .dark .table-wrapper::-webkit-scrollbar-thumb {
+            background: #64748b; 
+        }
+        .dark .table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        /* Smooth transition for table rows and themes */
+        tbody tr, body, header, section, input, textarea, select {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-[#f1f5f9] dark:bg-slate-900 text-slate-800 dark:text-slate-200 antialiased min-h-screen flex flex-col">
+
+    <!-- Header Profesional -->
+    <header class="bg-[#0f172a] text-white shadow-lg border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="bg-indigo-600 p-2 rounded-lg">
+                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-slate-100">Control de Préstamos</h1>
+                    <p class="text-sm text-slate-400 font-medium">Instituto de Investigación</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <!-- Theme Toggle Button -->
+                <button id="themeToggleBtn" class="p-2 rounded-full bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Alternar modo oscuro">
+                    <!-- Sun Icon (hidden in light mode) -->
+                    <svg id="themeToggleLightIcon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                    <!-- Moon Icon (hidden in dark mode) -->
+                    <svg id="themeToggleDarkIcon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                </button>
+                <div class="hidden sm:flex items-center text-sm font-medium text-slate-300 bg-slate-800 py-1.5 px-4 rounded-full border border-slate-700">
+                    <span id="currentDateDisplay"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-8">
+        
+        <!-- Form Section -->
+        <section id="formSection" class="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 sm:p-8 transition-all duration-300 relative overflow-hidden">
+            <!-- Edit Mode Indicator (Hidden by default) -->
+            <div id="editModeIndicator" class="absolute top-0 left-0 w-full bg-amber-500 text-white text-xs font-bold text-center py-1 hidden">
+                MODO EDICIÓN ACTIVO
+            </div>
+
+            <div class="flex items-center justify-between mb-6 mt-2">
+                <h2 id="formTitle" class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                    <svg class="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Registrar Nuevo Préstamo
+                </h2>
+                <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 py-1.5 px-3 rounded-md transition-colors font-medium">
+                    Cancelar Edición
+                </button>
+            </div>
+            
+            <form id="loanForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Hidden ID field for editing -->
+                <input type="hidden" id="editId" value="">
+                
+                <!-- Nombre -->
+                <div class="col-span-1 md:col-span-2">
+                    <label for="name" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Nombre del Lector</label>
+                    <input type="text" id="name" required class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 placeholder-slate-400" placeholder="Ej. Dra. María González">
+                </div>
+
+                <!-- Correo (Opcional) -->
+                <div class="col-span-1 md:col-span-2">
+                    <label for="email" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Correo Electrónico <span class="text-slate-400 font-normal text-xs">(Opcional)</span>
+                    </label>
+                    <input type="email" id="email" class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 placeholder-slate-400" placeholder="correo@instituto.edu">
+                </div>
+
+                <!-- Título del libro -->
+                <div class="col-span-1 md:col-span-2">
+                    <label for="bookTitle" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Título de la Obra</label>
+                    <input type="text" id="bookTitle" required class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 placeholder-slate-400" placeholder="Título completo">
+                </div>
+
+                <!-- Autor -->
+                <div class="col-span-1">
+                    <label for="author" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Autor</label>
+                    <input type="text" id="author" required class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 placeholder-slate-400" placeholder="Autor principal">
+                </div>
+
+                <!-- Nº Tejuelo -->
+                <div class="col-span-1">
+                    <label for="tejuelo" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Nº de Tejuelo</label>
+                    <input type="text" id="tejuelo" required class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 placeholder-slate-400 font-mono" placeholder="Ej. 340.1 PER">
+                </div>
+
+                <!-- Fecha de Préstamo -->
+                <div class="col-span-1 md:col-span-2">
+                    <label for="loanDate" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Fecha de Préstamo</label>
+                    <input type="date" id="loanDate" required class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 [color-scheme:light] dark:[color-scheme:dark]">
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">La devolución suma 15 días hábiles automáticamente.</p>
+                </div>
+
+                <!-- Observaciones -->
+                <div class="col-span-1 md:col-span-4">
+                    <label for="notes" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Observaciones</label>
+                    <textarea id="notes" rows="2" class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 placeholder-slate-400" placeholder="Estado físico del libro, si incluye CD, etc..."></textarea>
+                </div>
+
+                <!-- Botón de Envío -->
+                <div class="col-span-1 md:col-span-4 flex justify-end mt-2">
+                    <button type="submit" id="submitBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2 transform active:scale-95">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                        <span id="submitBtnText">Guardar Préstamo</span>
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Table / Management Section -->
+        <section class="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
+            
+            <!-- Toolbar: Search, Filter & Export -->
+            <div class="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                
+                <div class="relative w-full lg:w-96">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input type="text" id="searchInput" placeholder="Buscar por lector, libro, tejuelo..." class="block w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg leading-5 bg-white dark:bg-slate-700 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors">
+                </div>
+                
+                <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                    <select id="filterStatus" class="rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer">
+                        <option value="all">📚 Todos los estados</option>
+                        <option value="Pendiente">⏳ Pendientes</option>
+                        <option value="Vencido">⚠️ Vencidos</option>
+                        <option value="Devuelto">✅ Devueltos</option>
+                    </select>
+
+                    <button onclick="exportToCSV()" class="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Exportar CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="table-wrapper overflow-x-auto">
+                <table class="w-full text-left border-collapse whitespace-nowrap min-w-max">
+                    <thead>
+                        <tr class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider font-bold">
+                            <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Lector y Contacto</th>
+                            <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Información del Libro</th>
+                            <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Plazos</th>
+                            <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Estado</th>
+                            <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600 text-right">Administrar</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loanTableBody" class="divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+                        <!-- JS injects rows here -->
+                    </tbody>
+                </table>
+                
+                <!-- Empty State -->
+                <div id="emptyState" class="hidden flex-col items-center justify-center py-16 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50">
+                    <svg class="w-16 h-16 mb-4 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    <p class="text-xl font-semibold text-slate-600 dark:text-slate-300">No se encontraron registros</p>
+                    <p class="text-sm mt-1">Ajusta los filtros de búsqueda o registra un nuevo préstamo.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Custom Alert Modal -->
+    <div id="customAlert" class="fixed inset-0 bg-slate-900 bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 transform scale-95 transition-transform duration-300 border border-slate-100 dark:border-slate-700">
+            <div class="flex items-center gap-3 mb-4">
+                <div id="alertIcon" class="p-2 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <h3 id="alertTitle" class="text-lg font-bold text-slate-800 dark:text-white">Notificación</h3>
+            </div>
+            <p id="alertMessage" class="text-slate-600 dark:text-slate-300 mb-6 font-medium">Mensaje aquí.</p>
+            <div class="flex justify-end">
+                <button onclick="closeAlert()" class="bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white font-medium py-2 px-5 rounded-lg transition-colors shadow-md">
+                    Entendido
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // --- Theme Management ---
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const themeToggleDarkIcon = document.getElementById('themeToggleDarkIcon');
+        const themeToggleLightIcon = document.getElementById('themeToggleLightIcon');
+
+        // Initial icon state
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            themeToggleLightIcon.classList.remove('hidden');
+        } else {
+            themeToggleDarkIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', function() {
+            themeToggleDarkIcon.classList.toggle('hidden');
+            themeToggleLightIcon.classList.toggle('hidden');
+
+            if (localStorage.getItem('theme')) {
+                if (localStorage.getItem('theme') === 'light') {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                }
+            } else {
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                }
+            }
+        });
+
+
+        // --- State Management ---
+        const STORAGE_KEY = 'gioja_library_loans_v2';
+        let loans = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+
+        // --- DOM Elements ---
+        const loanForm = document.getElementById('loanForm');
+        const loanDateInput = document.getElementById('loanDate');
+        const loanTableBody = document.getElementById('loanTableBody');
+        const emptyState = document.getElementById('emptyState');
+        const filterStatus = document.getElementById('filterStatus');
+        const searchInput = document.getElementById('searchInput');
+        
+        // Form & Edit Mode
+        const formSection = document.getElementById('formSection');
+        const formTitle = document.getElementById('formTitle');
+        const submitBtnText = document.getElementById('submitBtnText');
+        const submitBtn = document.getElementById('submitBtn');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+        const editIdInput = document.getElementById('editId');
+        const editModeIndicator = document.getElementById('editModeIndicator');
+
+        // Modal Elements
+        const customAlert = document.getElementById('customAlert');
+        const alertTitle = document.getElementById('alertTitle');
+        const alertMessage = document.getElementById('alertMessage');
+        const alertIcon = document.getElementById('alertIcon');
+
+        // --- Initialization ---
+        function init() {
+            // Display current date in header
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('currentDateDisplay').textContent = new Date().toLocaleDateString('es-ES', options);
+
+            setTodayAsDefaultDate();
+            renderTable();
+        }
+
+        function setTodayAsDefaultDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            loanDateInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+
+        // --- Utility Functions ---
+        
+        // Add business days (skipping weekends)
+        function addBusinessDays(dateString, daysToAdd) {
+            const [year, month, day] = dateString.split('-');
+            let d = new Date(year, month - 1, day);
+            
+            let added = 0;
+            while (added < daysToAdd) {
+                d.setDate(d.getDate() + 1);
+                // 0 is Sunday, 6 is Saturday
+                if (d.getDay() !== 0 && d.getDay() !== 6) { 
+                    added++;
+                }
+            }
+            
+            const ry = d.getFullYear();
+            const rm = String(d.getMonth() + 1).padStart(2, '0');
+            const rd = String(d.getDate()).padStart(2, '0');
+            return `${ry}-${rm}-${rd}`;
+        }
+
+        // Format Date for display (DD/MM/YYYY)
+        function formatDateForDisplay(ymdString) {
+            if (!ymdString) return '-';
+            const [y, m, d] = ymdString.split('-');
+            return `${d}/${m}/${y}`;
+        }
+
+        // Calculate dynamic status based on date
+        function getComputedStatus(loan) {
+            if (loan.status === 'Devuelto') return 'Devuelto';
+            
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            const [year, month, day] = loan.returnDate.split('-');
+            const returnDateObj = new Date(year, month - 1, day);
+            returnDateObj.setHours(0,0,0,0);
+            
+            if (today > returnDateObj) {
+                return 'Vencido';
+            }
+            return 'Pendiente';
+        }
+
+        // Alert System
+        function showAlert(title, message, type = 'info') {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            
+            // Adjust icon colors based on type
+            if(type === 'success') {
+                alertIcon.className = "p-2 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400";
+                alertIcon.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+            } else if (type === 'warning') {
+                alertIcon.className = "p-2 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400";
+                alertIcon.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
+            } else {
+                alertIcon.className = "p-2 rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400";
+                alertIcon.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+            }
+
+            customAlert.classList.remove('hidden');
+            void customAlert.offsetWidth; 
+            customAlert.classList.remove('opacity-0');
+            customAlert.firstElementChild.classList.remove('scale-95');
+        }
+
+        function closeAlert() {
+            customAlert.classList.add('opacity-0');
+            customAlert.firstElementChild.classList.add('scale-95');
+            setTimeout(() => {
+                customAlert.classList.add('hidden');
+            }, 300);
+        }
+
+        // CSV Export
+        window.exportToCSV = function() {
+            if(loans.length === 0) {
+                showAlert('Sin datos', 'No hay registros para exportar.', 'warning');
+                return;
+            }
+
+            const headers = ['Nombre Lector', 'Correo', 'Título del Libro', 'Autor', 'Tejuelo', 'Fecha Préstamo', 'Fecha Límite', 'Estado Actual', 'Renovaciones', 'Observaciones'];
+            
+            const rows = loans.map(l => {
+                const computedStatus = getComputedStatus(l);
+                return [
+                    l.name, l.email || 'Sin correo', l.bookTitle, l.author, l.tejuelo,
+                    formatDateForDisplay(l.loanDate), formatDateForDisplay(l.returnDate), 
+                    computedStatus, l.renewals, (l.notes || '').replace(/\n/g, ' ')
+                ].map(text => `"${String(text).replace(/"/g, '""')}"`).join(',');
+            });
+
+            // BOM to force Excel to read UTF-8 properly
+            const BOM = "\uFEFF"; 
+            const csvContent = BOM + [headers.join(','), ...rows].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `prestamos_biblioteca_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- Core Data Logic ---
+
+        function saveToStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(loans));
+        }
+
+        // Handle Form Submission (Create or Edit)
+        loanForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const id = editIdInput.value;
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim(); // No longer required
+            const bookTitle = document.getElementById('bookTitle').value.trim();
+            const author = document.getElementById('author').value.trim();
+            const tejuelo = document.getElementById('tejuelo').value.trim();
+            const loanDate = document.getElementById('loanDate').value;
+            const notes = document.getElementById('notes').value.trim();
+
+            if (id) {
+                // UPDATE EXISTING
+                const index = loans.findIndex(l => l.id === id);
+                if (index > -1) {
+                    const originalLoan = loans[index];
+                    // Recalculate return date if loan date changed, keep renewals in mind
+                    let returnDate = originalLoan.returnDate;
+                    if(originalLoan.loanDate !== loanDate) {
+                        returnDate = addBusinessDays(loanDate, 15 + (originalLoan.renewals * 15));
+                    }
+
+                    loans[index] = {
+                        ...originalLoan,
+                        name, email, bookTitle, author, tejuelo, loanDate, returnDate, notes
+                    };
+                    showAlert('Actualizado', 'El registro ha sido actualizado correctamente.', 'success');
+                }
+                cancelEdit(); // Reset form UI
+            } else {
+                // CREATE NEW
+                const returnDate = addBusinessDays(loanDate, 15);
+                const newLoan = {
+                    id: Date.now().toString(),
+                    name,
+                    email,
+                    bookTitle,
+                    author,
+                    tejuelo,
+                    loanDate,
+                    returnDate,
+                    notes,
+                    status: 'Pendiente', 
+                    renewals: 0
+                };
+                loans.unshift(newLoan); // Add to top
+                showAlert('Préstamo Registrado', `Devolución programada para el: ${formatDateForDisplay(returnDate)}.`, 'success');
+                loanForm.reset();
+                setTodayAsDefaultDate();
+            }
+
+            saveToStorage();
+            renderTable();
+        });
+
+        // Search & Filter events
+        filterStatus.addEventListener('change', renderTable);
+        searchInput.addEventListener('input', renderTable);
+
+        // --- Action Handlers ---
+
+        window.renewLoan = function(id) {
+            const loan = loans.find(l => l.id === id);
+            if (loan && loan.status !== 'Devuelto') {
+                const newReturnDate = addBusinessDays(loan.returnDate, 15);
+                loan.returnDate = newReturnDate;
+                loan.renewals += 1;
+                
+                saveToStorage();
+                showAlert('Préstamo Renovado', `Se han sumado 15 días hábiles. Nueva fecha límite: ${formatDateForDisplay(newReturnDate)}.`, 'success');
+                renderTable();
+            }
+        };
+
+        window.returnLoan = function(id) {
+            const loan = loans.find(l => l.id === id);
+            if (loan) {
+                loan.status = 'Devuelto';
+                saveToStorage();
+                renderTable();
+            }
+        };
+
+        // NEW: Undo Return
+        window.undoReturn = function(id) {
+            const loan = loans.find(l => l.id === id);
+            if (loan) {
+                loan.status = 'Pendiente'; // Setting it to 'Pendiente' lets getComputedStatus recalculate if it is Overdue or not.
+                saveToStorage();
+                renderTable();
+                showAlert('Deshecho', 'La devolución se ha revertido.', 'info');
+            }
+        };
+
+        window.deleteLoan = function(id) {
+            loans = loans.filter(l => l.id !== id);
+            saveToStorage();
+            renderTable();
+        }
+
+        window.startEdit = function(id) {
+            const loan = loans.find(l => l.id === id);
+            if (!loan) return;
+
+            // Populate form
+            editIdInput.value = loan.id;
+            document.getElementById('name').value = loan.name;
+            document.getElementById('email').value = loan.email || '';
+            document.getElementById('bookTitle').value = loan.bookTitle;
+            document.getElementById('author').value = loan.author;
+            document.getElementById('tejuelo').value = loan.tejuelo;
+            document.getElementById('loanDate').value = loan.loanDate;
+            document.getElementById('notes').value = loan.notes || '';
+
+            // Update UI for Edit Mode
+            formSection.classList.replace('border-slate-200', 'border-amber-400');
+            formSection.classList.replace('dark:border-slate-700', 'dark:border-amber-500');
+            formSection.classList.add('ring-4', 'ring-amber-50', 'dark:ring-amber-900/30');
+            editModeIndicator.classList.remove('hidden');
+            
+            formTitle.innerHTML = `<svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg> Editando Registro`;
+            
+            submitBtnText.textContent = 'Actualizar Cambios';
+            submitBtn.classList.replace('bg-indigo-600', 'bg-amber-600');
+            submitBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-amber-700');
+            
+            cancelEditBtn.classList.remove('hidden');
+
+            // Scroll to form
+            formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        window.cancelEdit = function() {
+            loanForm.reset();
+            editIdInput.value = '';
+            setTodayAsDefaultDate();
+
+            // Reset UI
+            formSection.classList.replace('border-amber-400', 'border-slate-200');
+            formSection.classList.replace('dark:border-amber-500', 'dark:border-slate-700');
+            formSection.classList.remove('ring-4', 'ring-amber-50', 'dark:ring-amber-900/30');
+            editModeIndicator.classList.add('hidden');
+            
+            formTitle.innerHTML = `<svg class="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Registrar Nuevo Préstamo`;
+            
+            submitBtnText.textContent = 'Guardar Préstamo';
+            submitBtn.classList.replace('bg-amber-600', 'bg-indigo-600');
+            submitBtn.classList.replace('hover:bg-amber-700', 'hover:bg-indigo-700');
+            
+            cancelEditBtn.classList.add('hidden');
+        }
+
+        // --- Rendering ---
+        function renderTable() {
+            loanTableBody.innerHTML = '';
+            const filterVal = filterStatus.value;
+            const searchVal = searchInput.value.toLowerCase();
+            
+            const filteredLoans = loans.filter(loan => {
+                // Text Search Filter
+                const searchStr = `${loan.name} ${loan.bookTitle} ${loan.author} ${loan.tejuelo}`.toLowerCase();
+                const matchesSearch = searchStr.includes(searchVal);
+                
+                // Status Filter
+                const computedStatus = getComputedStatus(loan);
+                const matchesStatus = filterVal === 'all' || computedStatus === filterVal;
+
+                return matchesSearch && matchesStatus;
+            });
+
+            if (filteredLoans.length === 0) {
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+            } else {
+                emptyState.classList.add('hidden');
+                emptyState.classList.remove('flex');
+                
+                filteredLoans.forEach(loan => {
+                    const computedStatus = getComputedStatus(loan);
+                    const isOverdue = computedStatus === 'Vencido';
+                    const isReturned = computedStatus === 'Devuelto';
+
+                    const tr = document.createElement('tr');
+                    // Style row based on overdue status
+                    tr.className = `group transition-colors ${isOverdue ? 'bg-red-50/60 hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}`;
+                    
+                    // --- Status Badge ---
+                    let statusBadge = '';
+                    if (isReturned) {
+                        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Devuelto</span>`;
+                    } else if (isOverdue) {
+                        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800 shadow-sm animate-pulse"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Vencido</span>`;
+                    } else {
+                        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-400 dark:border-indigo-800"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Pendiente</span>`;
+                    }
+
+                    // --- Mailto Link Generation (Conditional) ---
+                    let emailHtml = `<span class="text-slate-400 dark:text-slate-500 italic text-xs">Sin correo</span>`;
+                    if (loan.email) {
+                        const subject = encodeURIComponent(`Biblioteca Gioja - Préstamo de: ${loan.bookTitle}`);
+                        let bodyStr = `Estimado/a ${loan.name},\n\n`;
+                        if(isOverdue) {
+                            bodyStr += `Le recordamos que el plazo para devolver el libro "${loan.bookTitle}" se encuentra VENCIDO desde el ${formatDateForDisplay(loan.returnDate)}.\n\nPor favor, acérquese a la biblioteca a la brevedad para regularizar su situación.`;
+                        } else {
+                            bodyStr += `Este es un recordatorio de que debe devolver el libro "${loan.bookTitle}" el día ${formatDateForDisplay(loan.returnDate)}.\n\nSi necesita una renovación, comuníquese con nosotros.`;
+                        }
+                        bodyStr += `\n\nSaludos cordiales,\nBiblioteca Instituto Gioja`;
+                        const mailtoUrl = `mailto:${loan.email}?subject=${subject}&body=${encodeURIComponent(bodyStr)}`;
+
+                        emailHtml = `
+                            <span class="text-slate-500 dark:text-slate-400">${loan.email}</span>
+                            <a href="${mailtoUrl}" class="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors p-1 bg-slate-100 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/50 rounded-full" title="Enviar recordatorio por correo">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            </a>
+                        `;
+                    }
+
+                    // --- Action Buttons ---
+                    let actionsHtml = `<div class="flex justify-end gap-1 sm:gap-2">`;
+                    
+                    if (!isReturned) {
+                        actionsHtml += `
+                            <button onclick="returnLoan('${loan.id}')" title="Marcar como Devuelto" class="p-1.5 sm:p-2 text-white bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 rounded-md transition-colors shadow-sm focus:ring-2 focus:ring-emerald-400">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </button>
+                            <button onclick="renewLoan('${loan.id}')" title="Renovar Plazo (+15 días)" class="p-1.5 sm:p-2 text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/40 hover:bg-indigo-200 dark:hover:bg-indigo-900/80 rounded-md transition-colors shadow-sm border border-indigo-200 dark:border-indigo-800">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            </button>
+                        `;
+                    } else {
+                        // Undo Return Button
+                        actionsHtml += `
+                            <button onclick="undoReturn('${loan.id}')" title="Deshacer Devolución (Volver a Pendiente/Vencido)" class="p-1.5 sm:p-2 text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-md transition-colors shadow-sm border border-slate-300 dark:border-slate-600">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                            </button>
+                        `;
+                    }
+                    
+                    actionsHtml += `
+                        <button onclick="startEdit('${loan.id}')" title="Editar Registro" class="p-1.5 sm:p-2 text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 rounded-md transition-colors shadow-sm border border-amber-200 dark:border-amber-800 opacity-100 sm:opacity-0 group-hover:opacity-100">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        </button>
+                        <button onclick="deleteLoan('${loan.id}')" title="Eliminar Registro" class="p-1.5 sm:p-2 text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 rounded-md transition-colors shadow-sm border border-red-200 dark:border-red-800 opacity-100 sm:opacity-0 group-hover:opacity-100">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>`;
+
+                    tr.innerHTML = `
+                        <td class="px-6 py-4">
+                            <div class="font-bold text-slate-900 dark:text-white">${loan.name}</div>
+                            <div class="flex items-center gap-1.5 mt-1 text-sm">
+                                ${emailHtml}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="font-semibold text-slate-900 dark:text-white line-clamp-1" title="${loan.bookTitle}">${loan.bookTitle}</div>
+                            <div class="text-sm text-slate-600 dark:text-slate-400 mt-0.5">por ${loan.author}</div>
+                            <div class="mt-2 flex flex-wrap gap-2 items-center">
+                                <span class="text-xs font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 px-2 py-0.5 rounded shadow-sm">Tej: ${loan.tejuelo}</span>
+                            </div>
+                            ${loan.notes ? `<div class="text-xs text-slate-500 dark:text-slate-400 mt-2 bg-slate-100/80 dark:bg-slate-800 p-2 rounded-md italic max-w-xs truncate border border-slate-200 dark:border-slate-700" title="${loan.notes}">💬 ${loan.notes}</div>` : ''}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-col gap-1.5">
+                                <div class="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded inline-block w-fit">Retiró: <span class="text-slate-800 dark:text-slate-200 font-semibold ml-1">${formatDateForDisplay(loan.loanDate)}</span></div>
+                                <div class="text-xs px-2 py-1 rounded inline-block w-fit ${isOverdue ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}">
+                                    Vence: <span class="font-bold ml-1">${formatDateForDisplay(loan.returnDate)}</span>
+                                </div>
+                                ${loan.renewals > 0 ? `<div class="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1 mt-0.5"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Renovado (${loan.renewals})</div>` : ''}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 align-middle">
+                            ${statusBadge}
+                        </td>
+                        <td class="px-6 py-4 align-middle">
+                            ${actionsHtml}
+                        </td>
+                    `;
+                    loanTableBody.appendChild(tr);
+                });
+            }
+        }
+
+        // Run setup on load
+        window.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+</html>
