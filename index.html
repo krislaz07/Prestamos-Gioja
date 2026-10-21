@@ -156,6 +156,13 @@
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">La devolución suma 15 días hábiles automáticamente.</p>
                 </div>
 
+                <!-- Fecha Real de Devolución (Oculto en creación) -->
+                <div class="col-span-1 md:col-span-2 hidden" id="actualReturnDateContainer">
+                    <label for="actualReturnDate" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Fecha Real de Devolución</label>
+                    <input type="date" id="actualReturnDate" class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 [color-scheme:light] dark:[color-scheme:dark]">
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Opcional: Corregir el día exacto de la devolución.</p>
+                </div>
+
                 <!-- Observaciones -->
                 <div class="col-span-1 md:col-span-4">
                     <label for="notes" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Observaciones</label>
@@ -208,6 +215,7 @@
                             <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Lector y Contacto</th>
                             <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Información del Libro</th>
                             <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Plazos</th>
+                            <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Devuelto el</th>
                             <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Estado</th>
                             <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600 text-right">Administrar</th>
                         </tr>
@@ -291,6 +299,8 @@
         // --- DOM Elements ---
         const loanForm = document.getElementById('loanForm');
         const loanDateInput = document.getElementById('loanDate');
+        const actualReturnDateContainer = document.getElementById('actualReturnDateContainer');
+        const actualReturnDateInput = document.getElementById('actualReturnDate');
         const loanTableBody = document.getElementById('loanTableBody');
         const emptyState = document.getElementById('emptyState');
         const filterStatus = document.getElementById('filterStatus');
@@ -413,13 +423,14 @@
                 return;
             }
 
-            const headers = ['Nombre Lector', 'Correo', 'Título del Libro', 'Autor', 'Tejuelo', 'Fecha Préstamo', 'Fecha Límite', 'Estado Actual', 'Renovaciones', 'Observaciones'];
+            const headers = ['Nombre Lector', 'Correo', 'Título del Libro', 'Autor', 'Tejuelo', 'Fecha Préstamo', 'Fecha Límite', 'Fecha Real Devolución', 'Estado Actual', 'Renovaciones', 'Observaciones'];
             
             const rows = loans.map(l => {
                 const computedStatus = getComputedStatus(l);
                 return [
                     l.name, l.email || 'Sin correo', l.bookTitle, l.author, l.tejuelo,
-                    formatDateForDisplay(l.loanDate), formatDateForDisplay(l.returnDate), 
+                    formatDateForDisplay(l.loanDate), formatDateForDisplay(l.returnDate),
+                    l.actualReturnDate ? formatDateForDisplay(l.actualReturnDate) : 'No devuelto',
                     computedStatus, l.renewals, (l.notes || '').replace(/\n/g, ' ')
                 ].map(text => `"${String(text).replace(/"/g, '""')}"`).join(',');
             });
@@ -456,6 +467,7 @@
             const author = document.getElementById('author').value.trim();
             const tejuelo = document.getElementById('tejuelo').value.trim();
             const loanDate = document.getElementById('loanDate').value;
+            const actualReturnDate = document.getElementById('actualReturnDate').value || null;
             const notes = document.getElementById('notes').value.trim();
 
             if (id) {
@@ -469,9 +481,17 @@
                         returnDate = addBusinessDays(loanDate, 15 + (originalLoan.renewals * 15));
                     }
 
+                    // Determinar estado basado en si se ingresó o borró la fecha real de devolución
+                    let status = originalLoan.status;
+                    if (actualReturnDate) {
+                        status = 'Devuelto';
+                    } else if (originalLoan.status === 'Devuelto' && !actualReturnDate) {
+                        status = 'Pendiente';
+                    }
+
                     loans[index] = {
                         ...originalLoan,
-                        name, email, bookTitle, author, tejuelo, loanDate, returnDate, notes
+                        name, email, bookTitle, author, tejuelo, loanDate, returnDate, notes, actualReturnDate, status
                     };
                     showAlert('Actualizado', 'El registro ha sido actualizado correctamente.', 'success');
                 }
@@ -488,6 +508,7 @@
                     tejuelo,
                     loanDate,
                     returnDate,
+                    actualReturnDate: null,
                     notes,
                     status: 'Pendiente', 
                     renewals: 0
@@ -525,6 +546,13 @@
             const loan = loans.find(l => l.id === id);
             if (loan) {
                 loan.status = 'Devuelto';
+                // Capturar el día de hoy automáticamente como Fecha Real
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                loan.actualReturnDate = `${yyyy}-${mm}-${dd}`;
+                
                 saveToStorage();
                 renderTable();
             }
@@ -535,6 +563,7 @@
             const loan = loans.find(l => l.id === id);
             if (loan) {
                 loan.status = 'Pendiente'; // Setting it to 'Pendiente' lets getComputedStatus recalculate if it is Overdue or not.
+                loan.actualReturnDate = null; // Borrar la fecha real
                 saveToStorage();
                 renderTable();
                 showAlert('Deshecho', 'La devolución se ha revertido.', 'info');
@@ -559,9 +588,11 @@
             document.getElementById('author').value = loan.author;
             document.getElementById('tejuelo').value = loan.tejuelo;
             document.getElementById('loanDate').value = loan.loanDate;
+            document.getElementById('actualReturnDate').value = loan.actualReturnDate || '';
             document.getElementById('notes').value = loan.notes || '';
 
             // Update UI for Edit Mode
+            actualReturnDateContainer.classList.remove('hidden');
             formSection.classList.replace('border-slate-200', 'border-amber-400');
             formSection.classList.replace('dark:border-slate-700', 'dark:border-amber-500');
             formSection.classList.add('ring-4', 'ring-amber-50', 'dark:ring-amber-900/30');
@@ -585,6 +616,7 @@
             setTodayAsDefaultDate();
 
             // Reset UI
+            actualReturnDateContainer.classList.add('hidden');
             formSection.classList.replace('border-amber-400', 'border-slate-200');
             formSection.classList.replace('dark:border-amber-500', 'dark:border-slate-700');
             formSection.classList.remove('ring-4', 'ring-amber-50', 'dark:ring-amber-900/30');
@@ -716,6 +748,14 @@
                                     Vence: <span class="font-bold ml-1">${formatDateForDisplay(loan.returnDate)}</span>
                                 </div>
                                 ${loan.renewals > 0 ? `<div class="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1 mt-0.5"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Renovado (${loan.renewals})</div>` : ''}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 align-middle">
+                            <div class="text-sm text-slate-800 dark:text-slate-200 font-medium flex items-center">
+                                ${loan.actualReturnDate 
+                                    ? `<svg class="w-4 h-4 text-emerald-500 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${formatDateForDisplay(loan.actualReturnDate)}` 
+                                    : `<span class="text-slate-400 dark:text-slate-500 italic">-</span>`
+                                }
                             </div>
                         </td>
                         <td class="px-6 py-4 align-middle">
