@@ -156,17 +156,17 @@
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">La devolución suma 15 días hábiles automáticamente.</p>
                 </div>
 
-                <!-- Fecha Real de Devolución (Oculto en creación) -->
-                <div class="col-span-1 md:col-span-2 hidden" id="actualReturnDateContainer">
-                    <label for="actualReturnDate" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Fecha Real de Devolución</label>
-                    <input type="date" id="actualReturnDate" class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 [color-scheme:light] dark:[color-scheme:dark]">
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Opcional: Corregir el día exacto de la devolución.</p>
-                </div>
-
                 <!-- Observaciones -->
                 <div class="col-span-1 md:col-span-4">
                     <label for="notes" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Observaciones</label>
                     <textarea id="notes" rows="2" class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 placeholder-slate-400" placeholder="Estado físico del libro, si incluye CD, etc..."></textarea>
+                </div>
+
+                <!-- Fecha Real de Devolución (Solo en edición) -->
+                <div id="actualReturnDateContainer" class="col-span-1 md:col-span-2 hidden">
+                    <label for="actualReturnDate" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Fecha Real de Devolución</label>
+                    <input type="date" id="actualReturnDate" class="w-full rounded-lg border-slate-300 dark:border-slate-600 border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm bg-slate-50 dark:bg-slate-700 dark:text-white focus:bg-white dark:focus:bg-slate-800 [color-scheme:light] dark:[color-scheme:dark]">
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Puedes corregirla. (Solo aplica si el estado es Devuelto).</p>
                 </div>
 
                 <!-- Botón de Envío -->
@@ -215,7 +215,6 @@
                             <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Lector y Contacto</th>
                             <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Información del Libro</th>
                             <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Plazos</th>
-                            <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Devuelto el</th>
                             <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600">Estado</th>
                             <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-600 text-right">Administrar</th>
                         </tr>
@@ -255,13 +254,16 @@
     </div>
 
     <!-- Scripts -->
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         // --- Theme Management ---
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const themeToggleDarkIcon = document.getElementById('themeToggleDarkIcon');
         const themeToggleLightIcon = document.getElementById('themeToggleLightIcon');
 
-        // Initial icon state
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             themeToggleLightIcon.classList.remove('hidden');
         } else {
@@ -291,10 +293,16 @@
             }
         });
 
+        // --- Firebase Cloud Storage Setup ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'biblioteca-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        
+        const app = Object.keys(firebaseConfig).length > 0 ? initializeApp(firebaseConfig) : null;
+        const auth = app ? getAuth(app) : null;
+        const db = app ? getFirestore(app) : null;
 
         // --- State Management ---
-        const STORAGE_KEY = 'gioja_library_loans_v2';
-        let loans = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        let loans = [];
 
         // --- DOM Elements ---
         const loanForm = document.getElementById('loanForm');
@@ -306,7 +314,6 @@
         const filterStatus = document.getElementById('filterStatus');
         const searchInput = document.getElementById('searchInput');
         
-        // Form & Edit Mode
         const formSection = document.getElementById('formSection');
         const formTitle = document.getElementById('formTitle');
         const submitBtnText = document.getElementById('submitBtnText');
@@ -315,20 +322,50 @@
         const editIdInput = document.getElementById('editId');
         const editModeIndicator = document.getElementById('editModeIndicator');
 
-        // Modal Elements
         const customAlert = document.getElementById('customAlert');
         const alertTitle = document.getElementById('alertTitle');
         const alertMessage = document.getElementById('alertMessage');
         const alertIcon = document.getElementById('alertIcon');
 
         // --- Initialization ---
-        function init() {
-            // Display current date in header
+        async function init() {
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             document.getElementById('currentDateDisplay').textContent = new Date().toLocaleDateString('es-ES', options);
-
             setTodayAsDefaultDate();
-            renderTable();
+            
+            // Autenticación y Conexión a la Nube
+            if (auth && db) {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined') {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    setupRealtimeListener();
+                } catch (error) {
+                    console.error("Authentication failed:", error);
+                    showAlert("Error", "No se pudo conectar con la base de datos.", "warning");
+                }
+            } else {
+                showAlert("Aviso", "Configuración de nube no detectada, ejecutando offline.", "warning");
+                renderTable();
+            }
+        }
+
+        function setupRealtimeListener() {
+            // Escuchar cambios en la nube en tiempo real (Persistencia Multi-PC)
+            const loansRef = collection(db, 'artifacts', appId, 'public', 'data', 'loans');
+            onSnapshot(loansRef, (snapshot) => {
+                loans = [];
+                snapshot.forEach((doc) => {
+                    loans.push({ id: doc.id, ...doc.data() });
+                });
+                // Ordenar por los más recientes primero
+                loans.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+                renderTable();
+            }, (error) => {
+                console.error("Firestore listener error:", error);
+            });
         }
 
         function setTodayAsDefaultDate() {
@@ -341,34 +378,28 @@
 
         // --- Utility Functions ---
         
-        // Add business days (skipping weekends)
         function addBusinessDays(dateString, daysToAdd) {
             const [year, month, day] = dateString.split('-');
             let d = new Date(year, month - 1, day);
-            
             let added = 0;
             while (added < daysToAdd) {
                 d.setDate(d.getDate() + 1);
-                // 0 is Sunday, 6 is Saturday
                 if (d.getDay() !== 0 && d.getDay() !== 6) { 
                     added++;
                 }
             }
-            
             const ry = d.getFullYear();
             const rm = String(d.getMonth() + 1).padStart(2, '0');
             const rd = String(d.getDate()).padStart(2, '0');
             return `${ry}-${rm}-${rd}`;
         }
 
-        // Format Date for display (DD/MM/YYYY)
         function formatDateForDisplay(ymdString) {
             if (!ymdString) return '-';
             const [y, m, d] = ymdString.split('-');
             return `${d}/${m}/${y}`;
         }
 
-        // Calculate dynamic status based on date
         function getComputedStatus(loan) {
             if (loan.status === 'Devuelto') return 'Devuelto';
             
@@ -385,12 +416,10 @@
             return 'Pendiente';
         }
 
-        // Alert System
-        function showAlert(title, message, type = 'info') {
+        window.showAlert = function(title, message, type = 'info') {
             alertTitle.textContent = title;
             alertMessage.textContent = message;
             
-            // Adjust icon colors based on type
             if(type === 'success') {
                 alertIcon.className = "p-2 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400";
                 alertIcon.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
@@ -408,7 +437,7 @@
             customAlert.firstElementChild.classList.remove('scale-95');
         }
 
-        function closeAlert() {
+        window.closeAlert = function() {
             customAlert.classList.add('opacity-0');
             customAlert.firstElementChild.classList.add('scale-95');
             setTimeout(() => {
@@ -416,26 +445,23 @@
             }, 300);
         }
 
-        // CSV Export
         window.exportToCSV = function() {
             if(loans.length === 0) {
                 showAlert('Sin datos', 'No hay registros para exportar.', 'warning');
                 return;
             }
 
-            const headers = ['Nombre Lector', 'Correo', 'Título del Libro', 'Autor', 'Tejuelo', 'Fecha Préstamo', 'Fecha Límite', 'Fecha Real Devolución', 'Estado Actual', 'Renovaciones', 'Observaciones'];
+            const headers = ['Nombre Lector', 'Correo', 'Título del Libro', 'Autor', 'Tejuelo', 'Fecha Préstamo', 'Fecha Límite', 'Estado Actual', 'Fecha Real Devolución', 'Renovaciones', 'Observaciones'];
             
             const rows = loans.map(l => {
                 const computedStatus = getComputedStatus(l);
                 return [
                     l.name, l.email || 'Sin correo', l.bookTitle, l.author, l.tejuelo,
-                    formatDateForDisplay(l.loanDate), formatDateForDisplay(l.returnDate),
-                    l.actualReturnDate ? formatDateForDisplay(l.actualReturnDate) : 'No devuelto',
-                    computedStatus, l.renewals, (l.notes || '').replace(/\n/g, ' ')
+                    formatDateForDisplay(l.loanDate), formatDateForDisplay(l.returnDate), 
+                    computedStatus, formatDateForDisplay(l.actualReturnDate) || '-', l.renewals, (l.notes || '').replace(/\n/g, ' ')
                 ].map(text => `"${String(text).replace(/"/g, '""')}"`).join(',');
             });
 
-            // BOM to force Excel to read UTF-8 properly
             const BOM = "\uFEFF"; 
             const csvContent = BOM + [headers.join(','), ...rows].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -450,137 +476,122 @@
             document.body.removeChild(link);
         }
 
-        // --- Core Data Logic ---
+        // --- Core Cloud Logic ---
 
-        function saveToStorage() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(loans));
+        async function saveLoanToCloud(loan) {
+            if (!auth || !db || !auth.currentUser) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'loans', loan.id);
+                await setDoc(docRef, loan);
+            } catch (error) {
+                console.error("Error saving to cloud:", error);
+                showAlert("Error", "No se pudo guardar el registro en la nube.", "warning");
+            }
         }
 
-        // Handle Form Submission (Create or Edit)
-        loanForm.addEventListener('submit', function(e) {
+        async function deleteLoanFromCloud(id) {
+            if (!auth || !db || !auth.currentUser) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'loans', id);
+                await deleteDoc(docRef);
+            } catch (error) {
+                console.error("Error deleting from cloud:", error);
+                showAlert("Error", "No se pudo eliminar el registro en la nube.", "warning");
+            }
+        }
+
+        loanForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const id = editIdInput.value;
             const name = document.getElementById('name').value.trim();
-            const email = document.getElementById('email').value.trim(); // No longer required
+            const email = document.getElementById('email').value.trim();
             const bookTitle = document.getElementById('bookTitle').value.trim();
             const author = document.getElementById('author').value.trim();
             const tejuelo = document.getElementById('tejuelo').value.trim();
             const loanDate = document.getElementById('loanDate').value;
-            const actualReturnDate = document.getElementById('actualReturnDate').value || null;
             const notes = document.getElementById('notes').value.trim();
+            const actualReturnDate = actualReturnDateInput.value;
 
             if (id) {
-                // UPDATE EXISTING
-                const index = loans.findIndex(l => l.id === id);
-                if (index > -1) {
-                    const originalLoan = loans[index];
-                    // Recalculate return date if loan date changed, keep renewals in mind
+                const originalLoan = loans.find(l => l.id === id);
+                if (originalLoan) {
                     let returnDate = originalLoan.returnDate;
                     if(originalLoan.loanDate !== loanDate) {
                         returnDate = addBusinessDays(loanDate, 15 + (originalLoan.renewals * 15));
                     }
 
-                    // Determinar estado basado en si se ingresó o borró la fecha real de devolución
-                    let status = originalLoan.status;
-                    if (actualReturnDate) {
-                        status = 'Devuelto';
-                    } else if (originalLoan.status === 'Devuelto' && !actualReturnDate) {
-                        status = 'Pendiente';
-                    }
-
-                    loans[index] = {
+                    const updatedLoan = {
                         ...originalLoan,
-                        name, email, bookTitle, author, tejuelo, loanDate, returnDate, notes, actualReturnDate, status
+                        name, email, bookTitle, author, tejuelo, loanDate, returnDate, notes, actualReturnDate
                     };
+                    await saveLoanToCloud(updatedLoan);
                     showAlert('Actualizado', 'El registro ha sido actualizado correctamente.', 'success');
                 }
-                cancelEdit(); // Reset form UI
+                cancelEdit();
             } else {
-                // CREATE NEW
                 const returnDate = addBusinessDays(loanDate, 15);
                 const newLoan = {
                     id: Date.now().toString(),
-                    name,
-                    email,
-                    bookTitle,
-                    author,
-                    tejuelo,
-                    loanDate,
-                    returnDate,
-                    actualReturnDate: null,
-                    notes,
+                    createdAt: new Date().toISOString(),
+                    name, email, bookTitle, author, tejuelo, loanDate, returnDate, notes,
                     status: 'Pendiente', 
-                    renewals: 0
+                    renewals: 0,
+                    actualReturnDate: ''
                 };
-                loans.unshift(newLoan); // Add to top
+                await saveLoanToCloud(newLoan);
                 showAlert('Préstamo Registrado', `Devolución programada para el: ${formatDateForDisplay(returnDate)}.`, 'success');
                 loanForm.reset();
                 setTodayAsDefaultDate();
             }
-
-            saveToStorage();
-            renderTable();
         });
 
-        // Search & Filter events
         filterStatus.addEventListener('change', renderTable);
         searchInput.addEventListener('input', renderTable);
 
         // --- Action Handlers ---
 
-        window.renewLoan = function(id) {
+        window.renewLoan = async function(id) {
             const loan = loans.find(l => l.id === id);
             if (loan && loan.status !== 'Devuelto') {
                 const newReturnDate = addBusinessDays(loan.returnDate, 15);
-                loan.returnDate = newReturnDate;
-                loan.renewals += 1;
-                
-                saveToStorage();
+                const updatedLoan = { ...loan, returnDate: newReturnDate, renewals: loan.renewals + 1 };
+                await saveLoanToCloud(updatedLoan);
                 showAlert('Préstamo Renovado', `Se han sumado 15 días hábiles. Nueva fecha límite: ${formatDateForDisplay(newReturnDate)}.`, 'success');
-                renderTable();
             }
         };
 
-        window.returnLoan = function(id) {
+        window.returnLoan = async function(id) {
             const loan = loans.find(l => l.id === id);
             if (loan) {
-                loan.status = 'Devuelto';
-                // Capturar el día de hoy automáticamente como Fecha Real
                 const today = new Date();
                 const yyyy = today.getFullYear();
                 const mm = String(today.getMonth() + 1).padStart(2, '0');
                 const dd = String(today.getDate()).padStart(2, '0');
-                loan.actualReturnDate = `${yyyy}-${mm}-${dd}`;
+                const todayStr = `${yyyy}-${mm}-${dd}`;
                 
-                saveToStorage();
-                renderTable();
+                const updatedLoan = { ...loan, status: 'Devuelto', actualReturnDate: todayStr };
+                await saveLoanToCloud(updatedLoan);
             }
         };
 
-        // NEW: Undo Return
-        window.undoReturn = function(id) {
+        window.undoReturn = async function(id) {
             const loan = loans.find(l => l.id === id);
             if (loan) {
-                loan.status = 'Pendiente'; // Setting it to 'Pendiente' lets getComputedStatus recalculate if it is Overdue or not.
-                loan.actualReturnDate = null; // Borrar la fecha real
-                saveToStorage();
-                renderTable();
+                const updatedLoan = { ...loan, status: 'Pendiente', actualReturnDate: '' };
+                await saveLoanToCloud(updatedLoan);
                 showAlert('Deshecho', 'La devolución se ha revertido.', 'info');
             }
         };
 
-        window.deleteLoan = function(id) {
-            loans = loans.filter(l => l.id !== id);
-            saveToStorage();
-            renderTable();
+        window.deleteLoan = async function(id) {
+            await deleteLoanFromCloud(id);
         }
 
         window.startEdit = function(id) {
             const loan = loans.find(l => l.id === id);
             if (!loan) return;
 
-            // Populate form
             editIdInput.value = loan.id;
             document.getElementById('name').value = loan.name;
             document.getElementById('email').value = loan.email || '';
@@ -588,11 +599,16 @@
             document.getElementById('author').value = loan.author;
             document.getElementById('tejuelo').value = loan.tejuelo;
             document.getElementById('loanDate').value = loan.loanDate;
-            document.getElementById('actualReturnDate').value = loan.actualReturnDate || '';
             document.getElementById('notes').value = loan.notes || '';
+            
+            if (loan.status === 'Devuelto') {
+                actualReturnDateContainer.classList.remove('hidden');
+                actualReturnDateInput.value = loan.actualReturnDate || '';
+            } else {
+                actualReturnDateContainer.classList.add('hidden');
+                actualReturnDateInput.value = '';
+            }
 
-            // Update UI for Edit Mode
-            actualReturnDateContainer.classList.remove('hidden');
             formSection.classList.replace('border-slate-200', 'border-amber-400');
             formSection.classList.replace('dark:border-slate-700', 'dark:border-amber-500');
             formSection.classList.add('ring-4', 'ring-amber-50', 'dark:ring-amber-900/30');
@@ -606,7 +622,6 @@
             
             cancelEditBtn.classList.remove('hidden');
 
-            // Scroll to form
             formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
@@ -614,9 +629,8 @@
             loanForm.reset();
             editIdInput.value = '';
             setTodayAsDefaultDate();
-
-            // Reset UI
             actualReturnDateContainer.classList.add('hidden');
+
             formSection.classList.replace('border-amber-400', 'border-slate-200');
             formSection.classList.replace('dark:border-amber-500', 'dark:border-slate-700');
             formSection.classList.remove('ring-4', 'ring-amber-50', 'dark:ring-amber-900/30');
@@ -638,11 +652,9 @@
             const searchVal = searchInput.value.toLowerCase();
             
             const filteredLoans = loans.filter(loan => {
-                // Text Search Filter
                 const searchStr = `${loan.name} ${loan.bookTitle} ${loan.author} ${loan.tejuelo}`.toLowerCase();
                 const matchesSearch = searchStr.includes(searchVal);
                 
-                // Status Filter
                 const computedStatus = getComputedStatus(loan);
                 const matchesStatus = filterVal === 'all' || computedStatus === filterVal;
 
@@ -662,20 +674,17 @@
                     const isReturned = computedStatus === 'Devuelto';
 
                     const tr = document.createElement('tr');
-                    // Style row based on overdue status
                     tr.className = `group transition-colors ${isOverdue ? 'bg-red-50/60 hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}`;
                     
-                    // --- Status Badge ---
                     let statusBadge = '';
                     if (isReturned) {
-                        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Devuelto</span>`;
+                        statusBadge = `<span class="inline-flex flex-col items-start gap-1"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Devuelto</span><span class="text-[10px] text-slate-500 dark:text-slate-400 ml-1">el ${formatDateForDisplay(loan.actualReturnDate)}</span></span>`;
                     } else if (isOverdue) {
                         statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800 shadow-sm animate-pulse"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Vencido</span>`;
                     } else {
                         statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-400 dark:border-indigo-800"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Pendiente</span>`;
                     }
 
-                    // --- Mailto Link Generation (Conditional) ---
                     let emailHtml = `<span class="text-slate-400 dark:text-slate-500 italic text-xs">Sin correo</span>`;
                     if (loan.email) {
                         const subject = encodeURIComponent(`Biblioteca Gioja - Préstamo de: ${loan.bookTitle}`);
@@ -696,7 +705,6 @@
                         `;
                     }
 
-                    // --- Action Buttons ---
                     let actionsHtml = `<div class="flex justify-end gap-1 sm:gap-2">`;
                     
                     if (!isReturned) {
@@ -709,7 +717,6 @@
                             </button>
                         `;
                     } else {
-                        // Undo Return Button
                         actionsHtml += `
                             <button onclick="undoReturn('${loan.id}')" title="Deshacer Devolución (Volver a Pendiente/Vencido)" class="p-1.5 sm:p-2 text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-md transition-colors shadow-sm border border-slate-300 dark:border-slate-600">
                                 <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
@@ -751,14 +758,6 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 align-middle">
-                            <div class="text-sm text-slate-800 dark:text-slate-200 font-medium flex items-center">
-                                ${loan.actualReturnDate 
-                                    ? `<svg class="w-4 h-4 text-emerald-500 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${formatDateForDisplay(loan.actualReturnDate)}` 
-                                    : `<span class="text-slate-400 dark:text-slate-500 italic">-</span>`
-                                }
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 align-middle">
                             ${statusBadge}
                         </td>
                         <td class="px-6 py-4 align-middle">
@@ -770,9 +769,7 @@
             }
         }
 
-        // Run setup on load
         window.addEventListener('DOMContentLoaded', init);
-
     </script>
 </body>
 </html>
